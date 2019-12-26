@@ -12,6 +12,7 @@
 "assistant.menu.revoke" = "开启消息防撤回";
 "assistant.menu.revokeSelf" = "拦截自己撤回消息";
 "assistant.menu.autoReply" = "自动回复设置";
+"assistant.menu.autoAIReply" = "AI自动回复设置";
 "assistant.menu.newWeChat" = "登录新微信";
 "assistant.menu.remoteControl" = "远程控制Mac";
 "assistant.menu.windowSticky" = "微信窗口置顶";
@@ -26,6 +27,9 @@
 "assistant.menu.revokeSelfToPhone" = "防撤回同步到手机";
 "assistant.menu.revokeSyncSingleChat" = "同步单聊";
 "assistant.menu.revokeSyncGroupChat" = "同步群聊";
+
+// 关于窗口
+"about.projectHomepageLabel" = "項目主頁:";
 
 //  撤回相关
 "assistant.revokeType.emoji" = "[表情]";
@@ -107,10 +111,12 @@
 "assistant.autoReply.content" = "回复内容";
 "assistant.autoReply.list" = "自动回复列表";
 "assistant.autoReply.aiDes" = "AI机器人自动撩妹, 具备上下文语义理解";
-"assistant.autoReply.aiTitle" = "AI自动回复";
+"assistant.autoReply.aiTitle" = "AI自动回复设置";
 "assistant.autoReply.alert.confirm" = "确定";
 "assistant.autoReply.alert.title" = "您还有一条自动回复设置未完成";
 "assistant.autoReply.alert.content" = "请完善未完成的自动回复设置";
+"assistant.autoReply.warning" = "警告";
+
 
 //  版本更新
 "assistant.update.alret.cancle" = "取消";
@@ -139,3 +145,14 @@
 "assistant.search.chatlog" = "以下为聊天记录👇🏻";
 "assistant.search.message.unread" = "未读";
 "assistant.search.yesterday" = "昨天";
+
+//  信息扩展
+"assistant.msgInfo.miniprogram" = "收到小程序消息";
+"assistant.msgInfo.miniprogram.name" = "小程序名称：";
+"assistant.msgInfo.miniprogram.title" = "标题：";
+"assistant.msgInfo.miniprogram.path" = "路径：";
+"assistant.msgInfo.miniprogram.share" = "参数：";
+"assistant.msgInfo.wcpay.redPacket" = "收到微信红包";
+"assistant.msgInfo.wcpay.redPacket.title" = "红包标题：";
+"assistant.msgInfo.wcpay.transfer" = "收到转账信息";
+"assistant.msgInfo.wcpay.transfer.desc" = "转账描述：";

@@ -25,13 +25,15 @@
 #import "YMDownloadManager.h"
 #import "YMNetWorkHelper.h"
 #import<CommonCrypto/CommonDigest.h>
-
+#import "YMIMContactsManager.h"
 @implementation NSObject (WeChatHook)
 
 + (void)hookWeChat {
   //      微信撤回消息
     if (LargerOrEqualVersion(@"2.3.29")) {
-         hookMethod(objc_getClass("AddMsgSyncCmdHandler"), @selector(handleSyncCmdId: withSyncCmdItems:onComplete:), [self class], @selector(hook_handleSyncCmdId: withSyncCmdItems:onComplete:));
+//         hookMethod(objc_getClass("AddMsgSyncCmdHandler"), @selector(handleSyncCmdId: withSyncCmdItems:onComplete:), [self class], @selector(hook_handleSyncCmdId: withSyncCmdItems:onComplete:));
+        hookMethod(objc_getClass("MessageService"), @selector(FFToNameFavChatZZ:sessionMsgList:), [self class], @selector(hook_FFToNameFavChatZZ:sessionMsgList:));
+      
     } else {
         SEL revokeMsgMethod = LargerOrEqualVersion(@"2.3.22") ? @selector(FFToNameFavChatZZ:) : @selector(onRevokeMsg:);
         hookMethod(objc_getClass("MessageService"), revokeMsgMethod, [self class], @selector(hook_onRevokeMsg:));
@@ -106,15 +108,7 @@
 //
 //    hookMethod(objc_getClass("MMChatsTableCellView"), @selector(initWithFrame:), [self class], @selector(cellhook_initWithFrame:));
 //    hookMethod(objc_getClass("MMTextField"), @selector(setTextColor:), [self class], @selector(hook_setTextColor:));
-    
-    
-    [ANYMethodLog logMethodWithClass:[objc_getClass("MMWebViewHelper") class] condition:^BOOL(SEL sel) {
-        return YES;
-    } before:^(id target, SEL sel, NSArray *args, int deep) {
-        NSLog(@"\n🐸类名:%@ 👍方法:%@\n%@", target, NSStringFromSelector(sel),args);
-    } after:^(id target, SEL sel, NSArray *args, NSTimeInterval interval, int deep, id retValue) {
-        NSLog(@"\n🚘类名:%@ 👍方法:%@\n%@\n↪️%@", target, NSStringFromSelector(sel),args,retValue);
-    }];
+
 }
 
 - (void)hook_setTextColor:(NSColor *)arg1
@@ -239,10 +233,10 @@
         if (status == TKVersionStatusNew) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 NSAlert *alert = [[NSAlert alloc] init];
-                [alert addButtonWithTitle:TKLocalizedString(@"assistant.update.alret.confirm")];
-                [alert addButtonWithTitle:TKLocalizedString(@"assistant.update.alret.forbid")];
-                [alert addButtonWithTitle:TKLocalizedString(@"assistant.update.alret.cancle")];
-                [alert setMessageText:TKLocalizedString(@"assistant.update.alret.title")];
+                [alert addButtonWithTitle:YMLocalizedString(@"assistant.update.alret.confirm")];
+                [alert addButtonWithTitle:YMLocalizedString(@"assistant.update.alret.forbid")];
+                [alert addButtonWithTitle:YMLocalizedString(@"assistant.update.alret.cancle")];
+                [alert setMessageText:YMLocalizedString(@"assistant.update.alret.title")];
                 [alert setInformativeText:message];
                 NSModalResponse respose = [alert runModal];
                 if (respose == NSAlertFirstButtonReturn) {
@@ -290,19 +284,36 @@
 
 
 #pragma mark - 撤回
-- (void)hook_handleSyncCmdId:(id)arg1 withSyncCmdItems:(id)arg2 onComplete:(id)arg3
+//备用撤回
+//- (void)hook_handleSyncCmdId:(id)arg1 withSyncCmdItems:(id)arg2 onComplete:(id)arg3
+//{
+//    NSArray <CmdItem *>*p_arg2 = (NSArray *)arg2;
+//    __weak __typeof (self) wself = self;
+//    [p_arg2 enumerateObjectsUsingBlock:^(CmdItem * _Nonnull item, NSUInteger idx, BOOL * _Nonnull stop) {
+//        AddMsg *addMsg = [objc_getClass("AddMsg") parseFromData:item.cmdBuf.buffer];
+//        NSString *msg = addMsg.content.string;
+//        if ([msg rangeOfString:@"<sysmsg"].length <= 0) {
+//          [wself hook_handleSyncCmdId:arg1 withSyncCmdItems:arg2 onComplete:arg3];
+//          return;
+//        }
+//        [wself _doParseRevokeMsg:msg msgData:nil arg1:arg1 arg2:arg2 arg3:arg3];
+//    }];
+//}
+
+- (void)hook_FFToNameFavChatZZ:(id)msgData sessionMsgList:(id)arg2
 {
-    NSArray <CmdItem *>*p_arg2 = (NSArray *)arg2;
-    __weak __typeof (self) wself = self;
-    [p_arg2 enumerateObjectsUsingBlock:^(CmdItem * _Nonnull item, NSUInteger idx, BOOL * _Nonnull stop) {
-        AddMsg *addMsg = [objc_getClass("AddMsg") parseFromData:item.cmdBuf.buffer];
-        NSString *msg = addMsg.content.string;
-        if ([msg rangeOfString:@"<sysmsg"].length <= 0) {
-          [wself hook_handleSyncCmdId:arg1 withSyncCmdItems:arg2 onComplete:arg3];
-          return;
-        }
-        [wself _doParseRevokeMsg:msg msgData:nil arg1:arg1 arg2:arg2 arg3:arg3];
-    }];
+    if (![[TKWeChatPluginConfig sharedConfig] preventRevokeEnable]) {
+        [self hook_FFToNameFavChatZZ:msgData sessionMsgList:arg2];
+        return;
+    }
+    id msg = msgData;
+    if ([msgData isKindOfClass:objc_getClass("MessageData")]) {
+        msg = [msgData valueForKey:@"msgContent"];
+    }
+    
+    if ([msg rangeOfString:@"<sysmsg"].length <= 0) return;
+    
+    [self _doParseRevokeMsg:msg msgData:msgData arg1:nil arg2:arg2 arg3:nil];
 }
 
 - (void)hook_onRevokeMsg:(id)msgData {
@@ -350,14 +361,14 @@
         if ([revokeMsgData isSendFromSelf] && ![[TKWeChatPluginConfig sharedConfig] preventSelfRevokeEnable]) {
             
             if (LargerOrEqualVersion(@"2.3.29")) {
-                [self hook_handleSyncCmdId:arg1 withSyncCmdItems:arg2 onComplete:arg3];
+                [self hook_FFToNameFavChatZZ:msgData sessionMsgList:arg2];
             } else {
                 [self hook_onRevokeMsg:msgData];
             }
             return;
         }
         NSString *msgContent = [[YMMessageManager shareManager] getMessageContentWithData:revokeMsgData];
-        NSString *newMsgContent = [NSString stringWithFormat:@"%@ \n%@",TKLocalizedString(@"assistant.revoke.otherMessage.tip"), msgContent];
+        NSString *newMsgContent = [NSString stringWithFormat:@"%@ \n%@",YMLocalizedString(@"assistant.revoke.otherMessage.tip"), msgContent];
         MessageData *newMsgData = ({
             MessageData *msg = [[objc_getClass("MessageData") alloc] initWithMsgType:0x2710];
             [msg setFromUsrName:revokeMsgData.toUsrName];
@@ -390,6 +401,7 @@
         }
         
         [self autoReplyWithMsg:addMsg];
+        [self autoReplyByAI:addMsg];
         
         NSString *currentUserName = [objc_getClass("CUtility") GetCurrentUserName];
         if ([addMsg.fromUserName.string isEqualToString:currentUserName] &&
@@ -402,6 +414,10 @@
             MessageService *msgService = [[objc_getClass("MMServiceCenter") defaultCenter] getService:objc_getClass("MessageService")];
             MessageData *msgData = [msgService GetMsgData:addMsg.fromUserName.string svrId:addMsg.newMsgId];
             [[YMDownloadManager new] downloadImageWithMsg:msgData];
+        }
+        
+        if (addMsg.msgType == 49) {
+            [YMMessageTool parseMiniProgramMsg:addMsg];
         }
         
     }];
@@ -453,7 +469,7 @@
         MMLoginOneClickViewController *loginVC = wechat.mainWindowController.loginViewController.oneClickViewController;
         loginVC.loginButton.hidden = YES;
         ////        [wechat.mainWindowController onAuthOK];
-        loginVC.descriptionLabel.stringValue = TKLocalizedString(@"assistant.autoAuth.tip");
+        loginVC.descriptionLabel.stringValue = YMLocalizedString(@"assistant.autoAuth.tip");
         loginVC.descriptionLabel.textColor = TK_RGB(0x88, 0x88, 0x88);
         loginVC.descriptionLabel.hidden = NO;
     } else {
@@ -495,7 +511,7 @@
         NSMutableParagraphStyle *pghStyle = [[NSMutableParagraphStyle alloc] init];
         pghStyle.alignment = NSTextAlignmentCenter;
         NSDictionary *dicAtt = @{NSForegroundColorAttributeName: kBG4, NSParagraphStyleAttributeName: pghStyle};
-        btn.attributedTitle = [[NSAttributedString alloc] initWithString:TKLocalizedString(@"assistant.autoLogin.text") attributes:dicAtt];
+        btn.attributedTitle = [[NSAttributedString alloc] initWithString:YMLocalizedString(@"assistant.autoLogin.text") attributes:dicAtt];
         
         btn;
     });
@@ -664,13 +680,9 @@
 }
 
 #pragma mark - Other
-/**
- 自动回复
- 
- @param addMsg 接收的消息
- */
-- (void)autoReplyWithMsg:(AddMsg *)addMsg {
-    
+
+- (void)autoReplyByAI:(AddMsg *)addMsg
+{
     if (addMsg.msgType != 1) return;
     
     NSString *userName = addMsg.fromUserName.string;
@@ -688,14 +700,12 @@
         //        该消息为公众号或者本人发送的消息
         return;
     }
-    NSArray *autoReplyModels = [[TKWeChatPluginConfig sharedConfig] autoReplyModels];
-    if (autoReplyModels.count < 1) {
+    YMAIAutoModel *AIModel = [[TKWeChatPluginConfig sharedConfig] AIReplyModel];
+    if (AIModel.specificContacts.count < 1) {
         return;
     }
-    YMAutoReplyModel *model = nil;
-    model = autoReplyModels[0];
     
-    [model.specificContacts enumerateObjectsUsingBlock:^(NSString *wxid, NSUInteger idx, BOOL * _Nonnull stop) {
+    [AIModel.specificContacts enumerateObjectsUsingBlock:^(NSString *wxid, NSUInteger idx, BOOL * _Nonnull stop) {
         if ([wxid isEqualToString:addMsg.fromUserName.string]) {
             
             NSString *content = @"";
@@ -719,6 +729,114 @@
             }];
         }
     }];
+}
+
+/**
+ 自动回复
+ 
+ @param addMsg 接收的消息
+ */
+- (void)autoReplyWithMsg:(AddMsg *)addMsg {
+    //    addMsg.msgType != 49
+    if (![[TKWeChatPluginConfig sharedConfig] autoReplyEnable]) return;
+    if (addMsg.msgType != 1 && addMsg.msgType != 3) return;
+    
+    YMAIAutoModel *AIModel = [[TKWeChatPluginConfig sharedConfig] AIReplyModel];
+    if ([[TKWeChatPluginConfig sharedConfig] autoReplyEnable]) {
+        __block BOOL flag = NO;
+        [AIModel.specificContacts enumerateObjectsUsingBlock:^(NSString * _Nonnull aiUsr, NSUInteger idx, BOOL * _Nonnull stop) {
+            if ([aiUsr isEqualToString:addMsg.fromUserName.string]) {
+                if (*stop) *stop = YES;
+                flag = YES;
+            }
+        }];
+        
+        if (flag) {
+            NSString *nick = nil;
+            if ([addMsg.fromUserName.string containsString:@"@chatroom"]) {
+                nick = @"此群";
+            } else {
+                nick = [YMIMContactsManager getWeChatNickName:addMsg.fromUserName.string];
+            }
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                NSString *message = nil;
+                if ([TKWeChatPluginConfig sharedConfig].languageType == PluginLanguageTypeZH) {
+                    message = [NSString stringWithFormat:@"⚠️警告⚠️\n您对@%@ 设置了AI回复且同时打开了自动回复\n小助手将只会对@%@ 进行AI回复",nick,nick];
+                } else {
+                    message = @"You cannot set AI reply and auto reply to him at the same time";
+                }
+                [YMMessageTool addLocalWarningMsg:message fromUsr:addMsg.fromUserName.string];
+            });
+            return;
+        }
+    };
+    
+    NSString *userName = addMsg.fromUserName.string;
+    
+    MMSessionMgr *sessionMgr = [[objc_getClass("MMServiceCenter") defaultCenter] getService:objc_getClass("MMSessionMgr")];
+    
+    WCContactData *msgContact = nil;
+    if (LargerOrEqualVersion(@"2.3.26")) {
+        msgContact = [sessionMgr getSessionContact:userName];
+    } else {
+        msgContact = [sessionMgr getContact:userName];
+    }
+    
+    if ([msgContact isBrandContact] || [msgContact isSelf]) {
+        //        该消息为公众号或者本人发送的消息
+        return;
+    }
+    NSArray *autoReplyModels = [[TKWeChatPluginConfig sharedConfig] autoReplyModels];
+    [autoReplyModels enumerateObjectsUsingBlock:^(YMAutoReplyModel *model, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (!model.enable) return;
+        if (!model.replyContent || model.replyContent.length == 0) return;
+        
+        if (model.enableSpecificReply) {
+            if ([model.specificContacts containsObject:userName]) {
+                [self replyWithMsg:addMsg model:model];
+            }
+            return;
+        }
+        if ([addMsg.fromUserName.string containsString:@"@chatroom"] && !model.enableGroupReply) return;
+        if (![addMsg.fromUserName.string containsString:@"@chatroom"] && !model.enableSingleReply) return;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+           [self replyWithMsg:addMsg model:model];
+        });
+    }];
+}
+
+- (void)replyWithMsg:(AddMsg *)addMsg model:(YMAutoReplyModel *)model {
+    NSString *msgContent = addMsg.content.string;
+    if ([addMsg.fromUserName.string containsString:@"@chatroom"]) {
+        NSRange range = [msgContent rangeOfString:@":\n"];
+        if (range.length > 0) {
+            msgContent = [msgContent substringFromIndex:range.location + range.length];
+        }
+    }
+    
+    NSArray *replyArray = [model.replyContent componentsSeparatedByString:@"|"];
+    int index = arc4random() % replyArray.count;
+    NSString *randomReplyContent = replyArray[index];
+    NSInteger delayTime = model.enableDelay ? model.delayTime : 0;
+    
+    if (model.enableRegex) {
+        NSString *regex = model.keyword;
+        NSError *error;
+        NSRegularExpression *regular = [NSRegularExpression regularExpressionWithPattern:regex options:NSRegularExpressionCaseInsensitive error:&error];
+        if (error) return;
+        NSInteger count = [regular numberOfMatchesInString:msgContent options:NSMatchingReportCompletion range:NSMakeRange(0, msgContent.length)];
+        if (count > 0) {
+            [[YMMessageManager shareManager] sendTextMessage:randomReplyContent toUsrName:addMsg.fromUserName.string delay:delayTime];
+        }
+    } else {
+        NSArray * keyWordArray = [model.keyword componentsSeparatedByString:@"|"];
+        [keyWordArray enumerateObjectsUsingBlock:^(NSString *keyword, NSUInteger idx, BOOL * _Nonnull stop) {
+            if ([keyword isEqualToString:@"*"] || [msgContent isEqualToString:keyword]) {
+                [[YMMessageManager shareManager] sendTextMessage:randomReplyContent toUsrName:addMsg.fromUserName.string delay:delayTime];
+                *stop = YES;
+            }
+        }];
+    }
 }
 
 /**
@@ -753,7 +871,7 @@
 - (void)replySelfWithMsg:(AddMsg *)addMsg {
     if (addMsg.msgType != 1 && addMsg.msgType != 3) return;
     
-    if ([addMsg.content.string isEqualToString:TKLocalizedString(@"assistant.remoteControl.getList")]) {
+    if ([addMsg.content.string isEqualToString:YMLocalizedString(@"assistant.remoteControl.getList")]) {
         NSString *callBack = [TKRemoteControlManager remoteControlCommandsString];
         [[YMMessageManager shareManager] sendTextMessageToSelf:callBack];
     }
